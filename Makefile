@@ -13,7 +13,7 @@ test-coverage:
 	uv run pytest --cov=page_analyzer --cov-report xml
 
 lint:
-	uv run ruff check gendiff
+	uv run ruff check page_analyzer
 
 check: test lint
 
