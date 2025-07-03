@@ -1,0 +1,19 @@
+[project]
+name = "hexlet-code"
+version = "0.1.0"
+description = "Page analyzer project"
+authors = [{name = "Vladimir Plesovskih", email = "vova.plesovkikh@gmail.com"}]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.1.1",
+    "gunicorn>=23.0.0",
+    "python-dotenv>=1.1.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "ruff>=0.12.1",
+]
