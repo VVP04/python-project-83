@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Сайт {{ url.id }}{% endblock %}
+
+{% block content %}
+    <h1 class="mb-4">Сайт: {{ url.name }}</h1>
+    
+    <table class="table" data-test="url">
+        <tbody>
+            <tr>
+                <th>ID</th>
+                <td>{{ url.id }}</td>
+            </tr>
+            <tr>
+                <th>Имя</th>
+                <td>{{ url.name }}</td>
+            </tr>
+            <tr>
+                <th>Дата создания</th>
+                <td>{{ url.created_at.strftime('%Y-%m-%d') }}</td>
+            </tr>
+        </tbody>
+    </table>
+{% endblock %}
