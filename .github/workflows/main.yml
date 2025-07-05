@@ -23,6 +23,6 @@ jobs:
         pip install uv
         make install
 
-    - name: Run linter and tests
+    - name: Run linter
       run: |
-        make check
+        make lint

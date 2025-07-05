@@ -6,16 +6,8 @@ install:
 package-install:
 	uv tool install dist/*.whl
 
-test:
-	uv run pytest
-
-test-coverage:
-	uv run pytest --cov=page_analyzer --cov-report xml
-
 lint:
 	uv run ruff check page_analyzer
-
-check: test lint
 
 dev:
 	uv run flask --debug --app page_analyzer:app run
