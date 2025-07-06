@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from flask import Flask, flash, redirect, render_template, request, url_for
 from psycopg2.extras import NamedTupleCursor
 
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -31,6 +32,52 @@ def get_db_connection():
         raise
 
 
+def validate_url(url):
+    if not url:
+        logger.warning("Empty URL submitted")
+        flash('URL обязателен', 'danger')
+        return False, render_template('index.html'), 422
+        
+    if not validators.url(url):
+        logger.warning(f"Invalid URL format: {url}")
+        flash('Некорректный URL', 'danger')
+        return False, render_template('index.html'), 422
+        
+    if len(url) > 255:
+        logger.warning(f"URL exceeds length limit: {url[:50]}...")
+        flash('URL превышает 255 символов', 'danger')
+        return False, render_template('index.html'), 422
+    
+    return True, None, None
+
+
+def normalize_url(url):
+    parsed_url = urlparse(url)
+    return f"{parsed_url.scheme}://{parsed_url.netloc}"
+
+
+def execute_db_query(query, params=None, fetch=False, fetch_one=False):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=NamedTupleCursor) as cur:
+            cur.execute(query, params or ())
+            if fetch_one:
+                result = cur.fetchone()
+            elif fetch:
+                result = cur.fetchall()
+            else:
+                result = None
+            conn.commit()
+            return result
+    except Exception as e:
+        logger.error(f"Database error: {str(e)}", exc_info=True)
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/')
 def index():
     logger.info("Rendering index page")
@@ -42,49 +89,37 @@ def add_url():
     url = request.form.get('url')
     logger.info(f"Received URL submission: {url}")
 
-    if not url:
-        logger.warning("Empty URL submitted")
-        flash('URL обязателен', 'danger')
-        return render_template('index.html'), 422
-        
-    if not validators.url(url):
-        logger.warning(f"Invalid URL format: {url}")
-        flash('Некорректный URL', 'danger')
-        return render_template('index.html'), 422
-        
-    if len(url) > 255:
-        logger.warning(f"URL exceeds length limit: {url[:50]}...")
-        flash('URL превышает 255 символов', 'danger')
-        return render_template('index.html'), 422
+
+    is_valid, template, code = validate_url(url)
+    if not is_valid:
+        return template, code
     
-    parsed_url = urlparse(url)
-    normalized_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+
+    normalized_url = normalize_url(url)
     logger.info(f"Normalized URL: {normalized_url}")
 
     try:
-        conn = get_db_connection()
-        with conn.cursor(cursor_factory=NamedTupleCursor) as cur:
-
-            cur.execute(
-                "SELECT id FROM urls WHERE name = %s", (normalized_url,)
-                )
-            existing_url = cur.fetchone()
-            
-            if existing_url:
-                logger.info(f"URL already exists in DB, ID: {existing_url.id}")
-                flash('Страница уже существует', 'info')
-                return redirect(url_for('show_url', id=existing_url.id))
-            
-            cur.execute(
-                '''INSERT INTO urls (name, created_at) 
-                VALUES (%s, %s) RETURNING id''',
-                (normalized_url, datetime.now())
-            )
-            new_url = cur.fetchone()
-            conn.commit()
-            logger.info(f"Successfully added new URL, ID: {new_url.id}")
-            flash('Страница успешно добавлена', 'success')
-            return redirect(url_for('show_url', id=new_url.id))
+        existing_url = execute_db_query(
+            "SELECT id FROM urls WHERE name = %s",
+            (normalized_url,),
+            fetch_one=True
+        )
+        
+        if existing_url:
+            logger.info(f"URL already exists in DB, ID: {existing_url.id}")
+            flash('Страница уже существует', 'info')
+            return redirect(url_for('show_url', id=existing_url.id))
+        
+        new_url = execute_db_query(
+            '''INSERT INTO urls (name, created_at) 
+            VALUES (%s, %s) RETURNING id''',
+            (normalized_url, datetime.now()),
+            fetch_one=True
+        )
+        
+        logger.info(f"Successfully added new URL, ID: {new_url.id}")
+        flash('Страница успешно добавлена', 'success')
+        return redirect(url_for('show_url', id=new_url.id))
             
     except Exception as e:
         logger.error(f"Error processing URL: {str(e)}", exc_info=True)
@@ -94,20 +129,29 @@ def add_url():
 
 @app.route('/urls/<int:id>')
 def show_url(id):
-    logger.info(f"Requested URL details for ID: {id}")
     try:
-        conn = get_db_connection()
-        with conn.cursor(cursor_factory=NamedTupleCursor) as cur:
-            cur.execute("SELECT * FROM urls WHERE id = %s", (id,))
-            url = cur.fetchone()
+        url = execute_db_query(
+            "SELECT * FROM urls WHERE id = %s",
+            (id,),
+            fetch_one=True
+        )
         
         if not url:
             logger.warning(f"URL not found for ID: {id}")
             flash('Страница не найдена', 'danger')
             return redirect(url_for('index'))
-            
+        
+        checks = execute_db_query(
+            """SELECT id, status_code, created_at 
+            FROM url_checks 
+            WHERE url_id = %s 
+            ORDER BY created_at DESC""",
+            (id,),
+            fetch=True
+        )
+        
         logger.info(f"Successfully retrieved URL details for ID: {id}")
-        return render_template('url.html', url=url)
+        return render_template('url.html', url=url, checks=checks or [])
 
     except Exception as e:
         logger.error(f"Error fetching URL details: {str(e)}", exc_info=True)
@@ -117,19 +161,50 @@ def show_url(id):
 
 @app.route('/urls')
 def show_urls():
-    logger.info("Requesting all URLs list")
     try:
-        conn = get_db_connection()
-        with conn.cursor(cursor_factory=NamedTupleCursor) as cur:
-            cur.execute("SELECT * FROM urls ORDER BY created_at DESC")
-            urls = cur.fetchall()
-            logger.info(f"Retrieved {len(urls)} URLs from database")
-        return render_template('urls.html', urls=urls)
+        urls = execute_db_query(
+            """SELECT u.id, u.name, u.created_at, 
+                   MAX(uc.created_at) as last_check_date
+            FROM urls u
+            LEFT JOIN url_checks uc ON u.id = uc.url_id
+            GROUP BY u.id
+            ORDER BY u.created_at DESC""",
+            fetch=True
+        )
+        
+        logger.info(f"Retrieved {len(urls) if urls else 0} URLs from database")
+        return render_template('urls.html', urls=urls or [])
 
     except Exception as e:
         logger.error(f"Error fetching URLs list: {str(e)}", exc_info=True)
         flash('Ошибка при получении списка страниц', 'danger')
         return render_template('urls.html', urls=[])
+
+
+@app.post('/urls/<int:id>/checks')
+def check_url(id):
+    try:
+        url_exists = execute_db_query(
+            "SELECT id FROM urls WHERE id = %s",
+            (id,),
+            fetch_one=True
+        )
+        
+        if not url_exists:
+            flash('Страница не найдена', 'danger')
+            return redirect(url_for('show_urls'))
+        
+        execute_db_query(
+            "INSERT INTO url_checks (url_id, created_at) VALUES (%s, %s)",
+            (id, datetime.now())
+        )
+        
+        flash('Страница успешно проверена', 'success')
+    except Exception as e:
+        flash(str(e), 'danger')
+        logger.error(f"Error checking URL: {str(e)}")
+    finally:
+        return redirect(url_for('show_url', id=id))
 
 
 if __name__ == '__main__':

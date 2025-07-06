@@ -21,4 +21,29 @@
             </tr>
         </tbody>
     </table>
+
+
+    <h2 class="mt-4">Проверки</h2>
+    <form action="{{ url_for('check_url', id=url.id) }}" method="post">
+      <button type="submit" class="btn btn-primary">Запустить проверку</button>
+    </form>
+
+    <table class="table table-bordered mt-3" data-test="checks">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Код ответа</th>
+          <th>Дата проверки</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for check in checks %}
+          <tr>
+            <td>{{ check.id }}</td>
+            <td>{{ check.status_code if check.status_code else '' }}</td>
+            <td>{{ check.created_at.strftime('%Y-%m-%d') }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
 {% endblock %}
