@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 from flask import Flask, flash, redirect, render_template, request, url_for
 from psycopg2.extras import NamedTupleCursor
 
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -89,12 +88,10 @@ def add_url():
     url = request.form.get('url')
     logger.info(f"Received URL submission: {url}")
 
-
     is_valid, template, code = validate_url(url)
     if not is_valid:
         return template, code
     
-
     normalized_url = normalize_url(url)
     logger.info(f"Normalized URL: {normalized_url}")
 
