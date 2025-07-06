@@ -4,10 +4,12 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 import psycopg2
+import requests
 import validators
 from dotenv import load_dotenv
 from flask import Flask, flash, redirect, render_template, request, url_for
 from psycopg2.extras import NamedTupleCursor
+from requests.exceptions import RequestException
 
 logging.basicConfig(
     level=logging.INFO,
@@ -160,18 +162,19 @@ def show_url(id):
 def show_urls():
     try:
         urls = execute_db_query(
-            """SELECT u.id, u.name, u.created_at, 
-                   MAX(uc.created_at) as last_check_date
+            """SELECT 
+                u.id, 
+                u.name, 
+                u.created_at, 
+                MAX(uc.created_at) as last_check_date,
+                uc.status_code as last_status_code
             FROM urls u
             LEFT JOIN url_checks uc ON u.id = uc.url_id
-            GROUP BY u.id
+            GROUP BY u.id, uc.status_code
             ORDER BY u.created_at DESC""",
             fetch=True
         )
-        
-        logger.info(f"Retrieved {len(urls) if urls else 0} URLs from database")
-        return render_template('urls.html', urls=urls or [])
-
+        return render_template('urls.html', urls=urls)
     except Exception as e:
         logger.error(f"Error fetching URLs list: {str(e)}", exc_info=True)
         flash('Ошибка при получении списка страниц', 'danger')
@@ -181,27 +184,44 @@ def show_urls():
 @app.post('/urls/<int:id>/checks')
 def check_url(id):
     try:
-        url_exists = execute_db_query(
-            "SELECT id FROM urls WHERE id = %s",
+        url = execute_db_query(
+            "SELECT id, name FROM urls WHERE id = %s",
             (id,),
             fetch_one=True
         )
         
-        if not url_exists:
+        if not url:
             flash('Страница не найдена', 'danger')
             return redirect(url_for('show_urls'))
-        
-        execute_db_query(
-            "INSERT INTO url_checks (url_id, created_at) VALUES (%s, %s)",
-            (id, datetime.now())
-        )
-        
-        flash('Страница успешно проверена', 'success')
+
+        try:
+            response = requests.get(
+                url.name,
+                timeout=5,
+                headers={'User-Agent': 'Mozilla/5.0'}
+            )
+            response.raise_for_status()
+
+            execute_db_query(
+                """INSERT INTO url_checks (
+                    url_id, 
+                    status_code, 
+                    created_at
+                ) VALUES (%s, %s, %s)""",
+                (url.id, response.status_code, datetime.now())
+            )
+            
+            flash('Страница успешно проверена', 'success')
+            
+        except RequestException as e:
+            logger.error(f"Request failed for URL {url.name}: {str(e)}")
+            flash('Произошла ошибка при проверке', 'danger')
+            
     except Exception as e:
-        flash(str(e), 'danger')
-        logger.error(f"Error checking URL: {str(e)}")
-    finally:
-        return redirect(url_for('show_url', id=id))
+        logger.error(f"Error checking URL: {str(e)}", exc_info=True)
+        flash('Внутренняя ошибка сервера', 'danger')
+        
+    return redirect(url_for('show_url', id=id))
 
 
 if __name__ == '__main__':
