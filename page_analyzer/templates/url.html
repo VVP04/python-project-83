@@ -33,6 +33,9 @@
         <tr>
           <th>ID</th>
           <th>Код ответа</th>
+          <th>h1</th>
+          <th>title</th>
+          <th>description</th>
           <th>Дата проверки</th>
         </tr>
       </thead>
@@ -41,7 +44,10 @@
           <tr>
             <td>{{ check.id }}</td>
             <td>{{ check.status_code if check.status_code else '' }}</td>
-            <td>{{ check.created_at.strftime('%Y-%m-%d') }}</td>
+            <td>{{ check.h1 if check.h1 else '' }}</td>
+            <td>{{ check.title if check.title else '' }}</td>
+            <td>{{ check.description if check.description else '' }}</td>
+            <td>{{ check.created_at.strftime('%Y-%m-%d') if check.created_at else '' }}</td>
           </tr>
         {% endfor %}
       </tbody>

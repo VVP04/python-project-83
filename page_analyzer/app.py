@@ -2,6 +2,7 @@ import logging
 import os
 from datetime import datetime
 from urllib.parse import urlparse
+from bs4 import BeautifulSoup
 
 import psycopg2
 import requests
@@ -141,13 +142,19 @@ def show_url(id):
             return redirect(url_for('index'))
         
         checks = execute_db_query(
-            """SELECT id, status_code, created_at 
-            FROM url_checks 
-            WHERE url_id = %s 
-            ORDER BY created_at DESC""",
-            (id,),
-            fetch=True
-        )
+            """SELECT 
+                    id, 
+                    status_code,
+                    h1,
+                    title,
+                    description,
+                    created_at 
+                FROM url_checks 
+                WHERE url_id = %s 
+                ORDER BY created_at DESC""",
+                (id,),
+                fetch=True
+            )
         
         logger.info(f"Successfully retrieved URL details for ID: {id}")
         return render_template('url.html', url=url, checks=checks or [])
@@ -201,14 +208,30 @@ def check_url(id):
                 headers={'User-Agent': 'Mozilla/5.0'}
             )
             response.raise_for_status()
-
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            h1 = soup.find('h1')
+            title = soup.find('title')
+            meta_description = soup.find('meta', attrs={'name': 'description'})
+            
             execute_db_query(
                 """INSERT INTO url_checks (
                     url_id, 
-                    status_code, 
+                    status_code,
+                    h1,
+                    title,
+                    description, 
                     created_at
-                ) VALUES (%s, %s, %s)""",
-                (url.id, response.status_code, datetime.now())
+                ) VALUES (%s, %s, %s, %s, %s, %s)""",
+                (
+                    url.id,
+                    response.status_code,
+                    h1.get_text().strip() if h1 else None,
+                    title.get_text().strip() if title else None,
+                    meta_description.get('content') if meta_description else None,
+                    datetime.now()
+                )
             )
             
             flash('Страница успешно проверена', 'success')
