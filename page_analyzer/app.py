@@ -2,11 +2,11 @@ import logging
 import os
 from datetime import datetime
 from urllib.parse import urlparse
-from bs4 import BeautifulSoup
 
 import psycopg2
 import requests
 import validators
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from flask import Flask, flash, redirect, render_template, request, url_for
 from psycopg2.extras import NamedTupleCursor
@@ -213,7 +213,7 @@ def check_url(id):
             
             h1 = soup.find('h1')
             title = soup.find('title')
-            meta_description = soup.find('meta', attrs={'name': 'description'})
+            description = soup.find('meta', attrs={'name': 'description'})
             
             execute_db_query(
                 """INSERT INTO url_checks (
@@ -229,7 +229,7 @@ def check_url(id):
                     response.status_code,
                     h1.get_text().strip() if h1 else None,
                     title.get_text().strip() if title else None,
-                    meta_description.get('content') if meta_description else None,
+                    description.get('content') if description else None,
                     datetime.now()
                 )
             )
