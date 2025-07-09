@@ -10,7 +10,6 @@
             <tr>
                 <th>ID</th>
                 <th>URL</th>
-                <th>Дата создания</th>
                 <th>Последняя проверка</th>
                 <th>Код ответа</th>
             </tr>
@@ -20,7 +19,6 @@
                 <tr>
                     <td>{{ url.id }}</td>
                     <td><a href="{{ url_for('show_url', id=url.id) }}">{{ url.name }}</a></td>
-                    <td>{{ url.created_at.strftime('%Y-%m-%d') }}</td>
                     <td>{{ url.last_check_date.strftime('%Y-%m-%d') if url.last_check_date else '' }}</td>
                     <td>{{ url.last_status_code if url.last_status_code else '' }}</td>
                 </tr>

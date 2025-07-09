@@ -111,7 +111,7 @@ class UrlRepository:
     def get_all_urls_with_last_check():
         return UrlRepository.execute_query(
             """SELECT 
-                u.id, u.name, u.created_at, 
+                u.id, u.name,
                 MAX(uc.created_at) as last_check_date,
                 uc.status_code as last_status_code
             FROM urls u
