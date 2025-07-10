@@ -9,6 +9,9 @@
 ## Deployment Status
 [![Render](https://img.shields.io/badge/Render-Deployed-brightgreen)](https://python-project-83-zlel.onrender.com)
 
+## SonarQube
+[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=VVP04_python-project-83)](https://sonarcloud.io/summary/new_code?id=VVP04_python-project-83)
+
 ## Project Description 📝
 
 Page Analyzer is a web application that checks websites for SEO readiness. The project provides comprehensive analysis of web pages including URL validation, SEO metrics checking, and detailed reporting.
